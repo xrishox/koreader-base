@@ -1,4 +1,11 @@
 list(APPEND CFG_CMD COMMAND env)
+if(IOS)
+    list(APPEND CFG_CMD
+        ac_cv_type_gid_t=yes
+        ac_cv_type_uid_t=yes
+        ac_cv_type_nlink_t=yes
+    )
+endif()
 append_autotools_vars(CFG_CMD)
 list(APPEND CFG_CMD
     ${SOURCE_DIR}/configure --host=${CHOST} --prefix=/
@@ -7,9 +14,26 @@ list(APPEND CFG_CMD
     --with-threads=none
 )
 
-list(APPEND BUILD_CMD COMMAND make)
+if(IOS)
+    list(APPEND BUILD_CMD
+        COMMAND make lib/localcharset.h
+        COMMAND make -C lib
+    )
+else()
+    list(APPEND BUILD_CMD COMMAND make)
+endif()
 
-list(APPEND INSTALL_CMD COMMAND make DESTDIR=${STAGING_DIR} install)
+if(IOS)
+    list(APPEND INSTALL_CMD
+        COMMAND make -C lib libdir=${STAGING_DIR}/lib includedir=${STAGING_DIR}/include install-lib
+        COMMAND mkdir -p ${STAGING_DIR}/include
+        COMMAND cp include/iconv.h.inst ${STAGING_DIR}/include/iconv.h
+        COMMAND cp lib/libcharset.h ${STAGING_DIR}/include/libcharset.h
+        COMMAND cp lib/localcharset.h ${STAGING_DIR}/include/localcharset.h
+    )
+else()
+    list(APPEND INSTALL_CMD COMMAND make DESTDIR=${STAGING_DIR} install)
+endif()
 # Get rid of libtool crap…
 list(APPEND INSTALL_CMD COMMAND rm -f ${STAGING_DIR}/lib/libiconv.la ${STAGING_DIR}/lib/libcharset.la)
 

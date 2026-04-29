@@ -18,10 +18,12 @@ ABI compatibility).
 
 local ffi = require("ffi")
 local android = ffi.os == "Linux" and os.getenv("IS_ANDROID") and require("android")
+local ios_ok, ios = pcall(require, "ios")
+if not ios_ok then ios = nil end
 local log = android and android.LOGI or print
 
 local monolibtic = {
-    path = (android and android.nativeLibraryDir or "libs") .. "/libkoreader-monolibtic." .. (ffi.os == "OSX" and "dylib" or "so"),
+    path = (android and android.nativeLibraryDir or ios and ios.getNativeLibraryDir() or "libs") .. "/libkoreader-monolibtic." .. (ffi.os == "OSX" and "dylib" or "so"),
     redirects = {
         ["archive"]    = true,
         ["blitbuffer"] = true,
@@ -115,7 +117,11 @@ ffi.loadlib = function(...)
     return ffi.load(lib)
 end
 
-if android then
+if ios then
+    lib_search_path = ios.getNativeLibraryDir() .. "/?;libs/?"
+    lib_basic_format = "lib%s.dylib"
+    lib_version_format = "lib%s.%s.dylib"
+elseif android then
     -- Note: our libraries are not versioned on Android.
     lib_search_path = android.nativeLibraryDir .. "/?"
     -- Unversioned: libz.so

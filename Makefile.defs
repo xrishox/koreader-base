@@ -198,6 +198,27 @@ else ifeq ($(TARGET), macos)
 	SDL=builtin
 	EMULATE_READER=1
 	DARWIN = 1
+else ifeq ($(TARGET), ios)
+	IOS=1
+	DARWIN=1
+	SDL=builtin
+	MONOLIBTIC?=1
+	USE_CLANG=1
+	IOS_ARCH?=arm64
+	IOS_MIN_VERSION?=15.0
+	IOS_SDK?=$(if $(filter sim-% sim_% simulator-% simulator_% sim%,$(IOS_ARCH)),iphonesimulator,iphoneos)
+	IOS_XCRUN?=xcrun -sdk $(IOS_SDK)
+	IOS_SDKROOT:=$(shell $(IOS_XCRUN) --show-sdk-path)
+	IOS_ARCH_NAME?=$(patsubst sim-%,%,$(patsubst sim_%,%,$(patsubst simulator-%,%,$(patsubst simulator_%,%,$(IOS_ARCH)))))
+	IOS_VERSION_FLAG?=$(if $(filter $(IOS_SDK),iphonesimulator),-mios-simulator-version-min=$(IOS_MIN_VERSION),-mios-version-min=$(IOS_MIN_VERSION))
+	CHOST?=aarch64-apple-darwin
+	CC := $(shell $(IOS_XCRUN) -find clang)
+	CXX := $(shell $(IOS_XCRUN) -find clang++)
+	AR := $(shell $(IOS_XCRUN) -find ar)
+	LD := $(shell $(IOS_XCRUN) -find ld)
+	NM := $(shell $(IOS_XCRUN) -find nm)
+	RANLIB := $(shell $(IOS_XCRUN) -find ranlib)
+	STRIP := $(shell $(IOS_XCRUN) -find strip)
 else ifeq ($(TARGET), android)
 	ANDROID=1
 	MONOLIBTIC?=1
@@ -261,7 +282,9 @@ endif
 
 ifdef DARWIN
   USE_CLANG = 1
-  export MACOSX_DEPLOYMENT_TARGET := $(or $(MACOSX_DEPLOYMENT_TARGET),$(shell sw_vers -productVersion))
+  ifndef IOS
+    export MACOSX_DEPLOYMENT_TARGET := $(or $(MACOSX_DEPLOYMENT_TARGET),$(shell sw_vers -productVersion))
+  endif
 endif
 
 ifneq ($(CCACHE),)
@@ -275,7 +298,7 @@ endif
 #       Ensuring Lua/C modules have their own DT_NEEDED entry to the shared LuaJIT library works around this quirk (and is otherwise mostly harmless).
 #       Saner APIs behave like Linux, and wouldn't require this hack.
 USE_LUAJIT_LIB = $(or $(DARWIN),$(ANDROID),$(WIN32))
-SKIP_LUAJIT_BIN = $(ANDROID)
+SKIP_LUAJIT_BIN = $(or $(ANDROID),$(IOS))
 
 RCP := cp -R
 WGET ?= wget --no-verbose
@@ -296,7 +319,10 @@ SYMLINK += -snfr
 
 # set cross-compiler/host CC and CXX
 ifneq (,$(USE_CLANG))
-	ifdef CHOST
+	ifdef IOS
+		CC:=$(shell $(IOS_XCRUN) -find clang)
+		CXX:=$(shell $(IOS_XCRUN) -find clang++)
+	else ifdef CHOST
 		CC:=$(CHOST)-clang
 		CXX:=$(CHOST)-clang++
 	else
@@ -333,7 +359,15 @@ else
 endif
 
 # set cross-compiler/host AR LD RANLIB
-ifeq ($(TARGET), android)
+ifeq ($(TARGET), ios)
+	STRIP:=$(shell $(IOS_XCRUN) -find strip)
+	AR:=$(shell $(IOS_XCRUN) -find ar)
+	LD:=$(shell $(IOS_XCRUN) -find ld)
+	NM:=$(shell $(IOS_XCRUN) -find nm)
+	OBJCOPY:=objcopy
+	RANLIB:=$(shell $(IOS_XCRUN) -find ranlib)
+	READELF:=readelf
+else ifeq ($(TARGET), android)
 	STRIP:=llvm-strip
 	AR:=llvm-ar
 	LD:=ld
@@ -397,11 +431,15 @@ else
   BASE_CFLAGS += -DNDEBUG
 endif
 ifdef DARWIN
+ifdef IOS
+  BASE_CFLAGS += -isysroot $(IOS_SDKROOT) $(IOS_VERSION_FLAG) -arch $(IOS_ARCH_NAME)
+else
   # Work around Apple clang bug: `/usr/local/include` is inserted
   # at the start of the system include path list, above any other
   # entries, including `-isystem …` options passed on the command
   # line (cf. https://stackoverflow.com/a/66377265).
   BASE_CFLAGS += -idirafter /usr/local/include
+endif
 else
   # Trim down binary size (when combined with linker `--gc-sections`).
   BASE_CFLAGS += -fdata-sections -ffunction-sections
@@ -477,6 +515,9 @@ ifdef KODEBUG
   MACHINE = $(TARGET_MACHINE)-debug
 else
   MACHINE = $(TARGET_MACHINE)
+endif
+ifeq ($(TARGET), ios)
+  MACHINE := $(MACHINE)-$(IOS_SDK)
 endif
 
 # Use target-specific CFLAGS
@@ -609,6 +650,8 @@ else ifeq ($(TARGET), macos)
   else
     TARGET_CFLAGS = -mtune=generic
   endif
+else ifeq ($(TARGET), ios)
+  TARGET_CFLAGS =
 else ifdef EMULATE_READER
   TARGET_CFLAGS = -march=native
 endif
@@ -630,6 +673,9 @@ BASE_CFLAGS += -ffile-prefix-map=$(abspath $(KOR_BASE))/=
 CFLAGS:=$(BASE_CFLAGS) $(QFLAGS) $(CSTD_FLAGS)
 CXXFLAGS:=$(BASE_CFLAGS) $(QFLAGS) $(CXXSTD_FLAGS)
 HOSTCFLAGS:=$(BASE_CFLAGS) $(QFLAGS)
+ifdef IOS
+  HOSTCFLAGS := -O2 -g -pipe -fomit-frame-pointer $(if $(KODEBUG),,-DNDEBUG) $(QFLAGS)
+endif
 
 ifndef DARWIN
   LDFLAGS := -Wl,-O1,--as-needed,--gc-sections $(COMPAT_LDFLAGS)
@@ -649,7 +695,11 @@ ifndef DARWIN
     LDFLAGS += $(if $(MONOLIBTIC),-static-libstdc++)
   endif
 else
-  LDFLAGS := -Wl,-rpath,@executable_path/libs,-rpath,@executable_path/../koreader/libs
+  ifdef IOS
+    LDFLAGS := -isysroot $(IOS_SDKROOT) $(IOS_VERSION_FLAG) -arch $(IOS_ARCH_NAME)
+  else
+    LDFLAGS := -Wl,-rpath,@executable_path/libs,-rpath,@executable_path/../koreader/libs
+  endif
 endif
 
 # NOTE: Follow the NDK's lead
@@ -835,6 +885,10 @@ set(CMAKE_FIND_ROOT_PATH $(abspath $(STAGING_DIR)))
 set(CMAKE_PREFIX_PATH $${CMAKE_FIND_ROOT_PATH})
 # So we don't include an outdated `png.h` provided by one of macOS' frameworks.
 set(CMAKE_FIND_FRAMEWORK LAST)
+$(if $(IOS),set(CMAKE_SYSTEM_NAME iOS))
+$(if $(IOS),set(CMAKE_OSX_SYSROOT $(IOS_SDK)))
+$(if $(IOS),set(CMAKE_OSX_ARCHITECTURES $(IOS_ARCH_NAME)))
+$(if $(IOS),set(CMAKE_OSX_DEPLOYMENT_TARGET $(IOS_MIN_VERSION)))
 
 # Install directories.
 set(CMAKE_INSTALL_PREFIX $(abspath $(STAGING_DIR)) CACHE FILEPATH "install prefix")
@@ -843,6 +897,7 @@ set(CMAKE_INSTALL_INCLUDEDIR include CACHE FILEPATH "install directory: includes
 set(CMAKE_INSTALL_LIBDIR     lib     CACHE FILEPATH "install directory: libraries")
 
 set(APPLE $(DARWIN))
+set(IOS $(IOS))
 set(LINUX $(if $(DARWIN)$(WIN32),,1))
 set(WIN32 $(WIN32))
 
@@ -855,7 +910,7 @@ ifndef EMULATE_READER
 # CMAKE_SYSTEM_PROCESSOR
 # FIXME: use more fine grained values for ARM targets?
 # (Cf. https://github.com/taka-no-me/android-cmake)
-ifneq (,$(filter aarch64-%,$(TARGET_MACHINE)))
+ifneq (,$(filter aarch64-% arm64-%,$(TARGET_MACHINE)))
   CMAKE_SYSTEM_PROCESSOR = aarch64
 else ifneq (,$(filter arm-% armv7a-%,$(TARGET_MACHINE)))
   CMAKE_SYSTEM_PROCESSOR = arm
@@ -875,7 +930,10 @@ $(cmake_toolchain)
 # NOTE: use Linux for Android too (cf. https://github.com/taka-no-me/android-cmake and
 # https://android.googlesource.com/platform/ndk/+/master/build/cmake/android.toolchain.cmake)
 # In the meantime, I'll be sitting in the corner, crying hysterically.
-set(CMAKE_SYSTEM_NAME $(if $(DARWIN),Darwin,$(if $(WIN32),Windows,Linux)))
+set(CMAKE_SYSTEM_NAME $(if $(IOS),iOS,$(if $(DARWIN),Darwin,$(if $(WIN32),Windows,Linux))))
+$(if $(IOS),set(CMAKE_OSX_SYSROOT $(IOS_SDK)))
+$(if $(IOS),set(CMAKE_OSX_ARCHITECTURES $(IOS_ARCH_NAME)))
+$(if $(IOS),set(CMAKE_OSX_DEPLOYMENT_TARGET $(IOS_MIN_VERSION)))
 
 # Magical value that inhibits all of CMake's own NDK handling code. (Or shit goes boom.)
 $(if $(ANDROID),set(CMAKE_SYSTEM_VERSION 1))
@@ -955,6 +1013,7 @@ set(GLIBC_VERSION_MAX  $(GLIBC_VERSION_MAX))
 
 # Platform flags.
 set(ANDROID        $(ANDROID))
+set(IOS            $(IOS))
 set(CERVANTES      $(CERVANTES))
 set(KINDLE         $(KINDLE))
 set(KOBO           $(KOBO))
@@ -1016,8 +1075,8 @@ else
 MESON_CROSS_TOOLCHAIN = $(CMAKE_DIR)/meson_cross_toolchain.ini
 MESON_HOST_TOOLCHAIN = $(CMAKE_DIR)/meson_host_toolchain.ini
 
-MESON_CROSS_SYSTEM = $(if $(ANDROID),android,linux)
-ifneq (,$(filter aarch64-%,$(TARGET_MACHINE)))
+MESON_CROSS_SYSTEM = $(if $(IOS),ios,$(if $(ANDROID),android,linux))
+ifneq (,$(filter aarch64-% arm64-%,$(TARGET_MACHINE)))
   MESON_CROSS_CPU_FAMILY = aarch64
 else ifneq (,$(filter arm-% armv7a-%,$(TARGET_MACHINE)))
   MESON_CROSS_CPU_FAMILY = arm
@@ -1051,7 +1110,7 @@ c = [CCACHE, '$(strip $(HOSTCC))']
 # c_ld
 cpp = [CCACHE, '$(strip $(HOSTCXX))']
 # cpp_ld
-ar = '$(strip $(HOSTSTRIP))'
+ar = '$(strip $(HOSTAR))'
 ranlib = '$(strip $(HOSTRANLIB))'
 strip = 'true'
 

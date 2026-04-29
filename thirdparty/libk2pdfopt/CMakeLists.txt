@@ -3,6 +3,9 @@ if(NOT MONOLIBTIC)
     target_exports(k2pdfopt FILELIST_VAR CDECLS_FILES WRITE_TO_FILE ${CMAKE_PATCH_FILE} CDECLS koptcontext_cdecl)
     list(APPEND PATCH_CMD COMMAND ${ISED} "\$p" -e "\$s|.*|include(${CMAKE_PATCH_FILE})|" lib/CMakeLists.txt)
 endif()
+if(IOS)
+    list(APPEND PATCH_CMD COMMAND patch -p1 -i ${CMAKE_CURRENT_LIST_DIR}/ios-no-system.patch)
+endif()
 
 list(APPEND CMAKE_ARGS
     -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}

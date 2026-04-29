@@ -181,7 +181,7 @@ declare_koreader_target(
 )
 
 # koreader
-if(APPLE)
+if(APPLE AND NOT IOS)
     set(EXCLUDE_FROM_ALL)
 else()
     set(EXCLUDE_FROM_ALL EXCLUDE_FROM_ALL)

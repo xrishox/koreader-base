@@ -47,10 +47,15 @@ else()
         set(HOST_CC ${HOSTCC})
     endif()
 
+    if(IOS)
+        list(APPEND BUILD_ARGS "CROSS=${CCACHE} ")
+    else()
+        list(APPEND BUILD_ARGS "CROSS=${CCACHE} ${CHOST}-")
+    endif()
+
     list(APPEND BUILD_ARGS
-        "CROSS=${CCACHE} ${CHOST}-"
         CC=${HOSTCC}
-        CFLAGS=${BASE_CFLAGS}
+        CFLAGS=${HOSTCFLAGS}
         LDFLAGS=
         "HOST_CC=${CCACHE} ${HOST_CC}"
         HOST_CFLAGS=${HOSTCFLAGS}
@@ -63,6 +68,8 @@ else()
     )
     if(ANDROID)
         list(APPEND BUILD_ARGS TARGET_SYS=Linux)
+    elseif(IOS)
+        list(APPEND BUILD_ARGS TARGET_SYS=iOS)
     elseif(WIN32)
         list(APPEND BUILD_ARGS TARGET_SYS=Windows)
     endif()

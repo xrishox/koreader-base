@@ -93,7 +93,7 @@ endfunction()
 # }}}.
 
 # Ensure `MACOSX_DEPLOYMENT_TARGET` is set, and `CMAKE_OSX_DEPLOYMENT_TARGET` matches.
-if(APPLE)
+if(APPLE AND NOT IOS)
     if(NOT DEFINED ENV{MACOSX_DEPLOYMENT_TARGET} OR "$ENV{MACOSX_DEPLOYMENT_TARGET}" STREQUAL "")
         message(FATAL_ERROR "$MACOSX_DEPLOYMENT_TARGET is not set")
     endif()
@@ -101,6 +101,8 @@ if(APPLE)
         message(FATAL_ERROR "$MACOSX_DEPLOYMENT_TARGET / CMAKE_OSX_DEPLOYMENT_TARGET discrepancy: \"$ENV{MACOSX_DEPLOYMENT_TARGET}\" != \"${CMAKE_OSX_DEPLOYMENT_TARGET}\"")
     endif()
     message(STATUS "OSX deployment target: ${CMAKE_OSX_DEPLOYMENT_TARGET}")
+elseif(IOS)
+    message(STATUS "iOS deployment target: ${CMAKE_OSX_DEPLOYMENT_TARGET}")
 endif()
 
 # Git. {{{

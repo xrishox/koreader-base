@@ -108,6 +108,13 @@ function S.open(w, h, x, y)
     -- Allow clicks that focus the window to pass through as input events (macOS).
     SDL.SDL_SetHint("SDL_MOUSE_FOCUS_CLICKTHROUGH", "1")
 
+    -- On iOS, prefer native finger events over SDL's synthetic mouse events.
+    -- Consuming both paths can duplicate taps or skew hit testing in Simulator.
+    if S.getPlatform() == "iOS" then
+        SDL.SDL_SetHint("SDL_TOUCH_MOUSE_EVENTS", "0")
+        SDL.SDL_SetHint("SDL_MOUSE_TOUCH_EVENTS", "0")
+    end
+
     -- Enable VSYNC.
     SDL.SDL_SetHint("SDL_RENDER_VSYNC", "1")
 

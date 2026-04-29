@@ -1,0 +1,26 @@
+--- a/willuslib/filelist.c
++++ b/willuslib/filelist.c
+@@ -1103,7 +1103,9 @@
+     sprintf(cmd,"zip \"%s\" -@ < \"%s\" 1> z1.out 2> z1.err",zipfileabs,tmpfile);
+ #else
+     sprintf(cmd,"zip \"%s\" -@ < \"%s\" > /dev/null",zipfileabs,tmpfile);
+ #endif
++#ifndef __IPHONE_OS_VERSION_MIN_REQUIRED
+     system(cmd);
++#endif
+     wfile_set_wd(curdir);
+     wfile_remove_utf8(tmpfile);
+     if (wfile_status(zipfileabs)!=1)
+--- a/willuslib/willus.h
++++ b/willuslib/willus.h
+@@ -361,6 +361,10 @@
+ #include <time.h>
+ #include <stdarg.h>
+ 
++#ifdef __IPHONE_OS_VERSION_MIN_REQUIRED
++#define system(cmd) (-1)
++#endif
++
+ #define MAXFILENAMELEN 512
+ /*
+ ** My somewhat arbitrary limits

@@ -53,9 +53,17 @@ list(APPEND CMAKE_ARGS
     -DZLIB_LIBRARY_RELEASE=${ZLIB}
 )
 
-list(APPEND BUILD_CMD COMMAND ninja)
+if(IOS)
+    list(APPEND BUILD_CMD COMMAND ${CMAKE_COMMAND} -E true)
+else()
+    list(APPEND BUILD_CMD COMMAND ninja)
+endif()
 
-append_binary_install_command(INSTALL_CMD sdcv)
+if(IOS)
+    list(APPEND INSTALL_CMD COMMAND ${CMAKE_COMMAND} -E true)
+else()
+    append_binary_install_command(INSTALL_CMD sdcv)
+endif()
 
 external_project(
     DOWNLOAD URL 265dbfda83a57810595d156877f3e6fd
