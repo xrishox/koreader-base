@@ -412,6 +412,10 @@ function S.waitForEvent(sec, usec)
         genTouchDownEvent(event, slot, x, y)
     elseif event.type == SDL.SDL_EVENT_MOUSE_WHEEL then
         genEmuEvent(C.EV_SDL, SDL.SDL_EVENT_MOUSE_WHEEL, event.wheel)
+    elseif event.type == SDL.SDL_EVENT_WILL_ENTER_BACKGROUND then
+        genEmuEvent(C.EV_SDL, SDL.SDL_EVENT_WILL_ENTER_BACKGROUND, 0)
+    elseif event.type == SDL.SDL_EVENT_DID_ENTER_FOREGROUND then
+        genEmuEvent(C.EV_SDL, SDL.SDL_EVENT_DID_ENTER_FOREGROUND, 0)
     elseif event.type == SDL.SDL_EVENT_DROP_FILE then
         local dropped_file_path = ffi.string(event.drop.data)
         genEmuEvent(C.EV_SDL, SDL.SDL_EVENT_DROP_FILE, dropped_file_path)
