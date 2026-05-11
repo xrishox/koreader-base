@@ -11,16 +11,3 @@
      wfile_set_wd(curdir);
      wfile_remove_utf8(tmpfile);
      if (wfile_status(zipfileabs)!=1)
---- a/willuslib/willus.h
-+++ b/willuslib/willus.h
-@@ -361,6 +361,10 @@
- #include <time.h>
- #include <stdarg.h>
-
-+#ifdef __IPHONE_OS_VERSION_MIN_REQUIRED
-+#define system(cmd) (-1)
-+#endif
-+
- #define MAXFILENAMELEN 512
- /*
- ** My somewhat arbitrary limits
