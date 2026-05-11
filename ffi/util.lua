@@ -8,6 +8,7 @@ local bit = require("bit")
 local ffi = require("ffi")
 local C = ffi.C
 local lfs = require("libs/libkoreader-lfs")
+local is_ios = pcall(require, "ios")
 
 local lshift = bit.lshift
 local band = bit.band
@@ -273,6 +274,9 @@ end
 
 --- Executes child process.
 function util.execute(...)
+    if is_ios then
+        return -1
+    end
     if util.isAndroid() then
         local A = require("android")
         return A.execute(...)
@@ -315,6 +319,9 @@ end
 --                       as waitpid will return -1 w/ an ECHILD errno.
 -- NOTE: Assumes the target platform is POSIX compliant.
 function util.runInSubProcess(func, with_pipe, double_fork)
+    if is_ios then
+        return nil, "Subprocesses are not supported on iOS"
+    end
     local parent_read_fd, child_write_fd
     if with_pipe then
         local pipe = ffi.new('int[2]', {-1, -1})

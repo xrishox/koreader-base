@@ -16,7 +16,7 @@
 @@ -361,6 +361,10 @@
  #include <time.h>
  #include <stdarg.h>
- 
+
 +#ifdef __IPHONE_OS_VERSION_MIN_REQUIRED
 +#define system(cmd) (-1)
 +#endif

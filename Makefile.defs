@@ -283,7 +283,7 @@ endif
 ifdef DARWIN
   USE_CLANG = 1
   ifndef IOS
-    export MACOSX_DEPLOYMENT_TARGET := $(or $(MACOSX_DEPLOYMENT_TARGET),$(shell sw_vers -productVersion))
+    export MACOSX_DEPLOYMENT_TARGET := $(or $(MACOSX_DEPLOYMENT_TARGET),$(shell sw_vers -productVersion | cut -d. -f1,2))
   endif
 endif
 

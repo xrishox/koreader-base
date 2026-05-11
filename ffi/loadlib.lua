@@ -21,9 +21,10 @@ local android = ffi.os == "Linux" and os.getenv("IS_ANDROID") and require("andro
 local ios_ok, ios = pcall(require, "ios")
 if not ios_ok then ios = nil end
 local log = android and android.LOGI or print
+local dylib = ios or ffi.os == "OSX"
 
 local monolibtic = {
-    path = (android and android.nativeLibraryDir or ios and ios.getNativeLibraryDir() or "libs") .. "/libkoreader-monolibtic." .. (ffi.os == "OSX" and "dylib" or "so"),
+    path = (android and android.nativeLibraryDir or ios and ios.getNativeLibraryDir() or "libs") .. "/libkoreader-monolibtic." .. (dylib and "dylib" or "so"),
     redirects = {
         ["archive"]    = true,
         ["blitbuffer"] = true,
