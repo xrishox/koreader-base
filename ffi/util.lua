@@ -219,17 +219,33 @@ function util.copyFile(from, to)
     end
     local tfp, terr = io.open(to, "wb")
     if not tfp then
+        ffp:close()
         return terr
     end
+    local err
     while true do
-        local bytes = ffp:read(8192)
+        local bytes, read_err = ffp:read(8192)
         if not bytes then
-            ffp:close()
+            err = read_err
             break
         end
-        tfp:write(bytes)
+        local ok, write_err = tfp:write(bytes)
+        if not ok then
+            err = write_err
+            break
+        end
     end
-    tfp:close()
+    local close_from_ok, close_from_err = ffp:close()
+    local close_to_ok, close_to_err = tfp:close()
+    if err then
+        return err
+    end
+    if not close_from_ok then
+        return close_from_err
+    end
+    if not close_to_ok then
+        return close_to_err
+    end
 end
 
 --[[--
