@@ -1,13 +1,121 @@
+diff --git a/willuslib/filelist.c b/willuslib/filelist.c
+index 1283e4e..7368d6c 100644
 --- a/willuslib/filelist.c
 +++ b/willuslib/filelist.c
-@@ -1103,7 +1103,9 @@
-     sprintf(cmd,"zip \"%s\" -@ < \"%s\" 1> z1.out 2> z1.err",zipfileabs,tmpfile);
- #else
-     sprintf(cmd,"zip \"%s\" -@ < \"%s\" > /dev/null",zipfileabs,tmpfile);
- #endif
-+#ifndef __IPHONE_OS_VERSION_MIN_REQUIRED
-     system(cmd);
+@@ -1060,0 +1061,6 @@ int filelist_create_zipfile(FILELIST *fl,char *zipfile,FILE *out)
++#ifdef __IPHONE_OS_VERSION_MIN_REQUIRED
++    (void)fl;
++    (void)zipfile;
++    nprintf(out,"make zipfile:  zip command not available on iOS.\n");
++    return(-3);
++#else
+@@ -1114,0 +1121 @@ int filelist_create_zipfile(FILELIST *fl,char *zipfile,FILE *out)
 +#endif
-     wfile_set_wd(curdir);
-     wfile_remove_utf8(tmpfile);
-     if (wfile_status(zipfileabs)!=1)
+@@ -1768,0 +1776,6 @@ int filelist_fill_from_zip(FILELIST *fl,char *zipfile,char *wildspec)
++#ifdef __IPHONE_OS_VERSION_MIN_REQUIRED
++    (void)fl;
++    (void)zipfile;
++    (void)wildspec;
++    return(-1);
++#else
+@@ -1791,0 +1805 @@ int filelist_fill_from_zip(FILELIST *fl,char *zipfile,char *wildspec)
++#endif
+diff --git a/willuslib/wfile.c b/willuslib/wfile.c
+index 5312058..ece8340 100644
+--- a/willuslib/wfile.c
++++ b/willuslib/wfile.c
+@@ -46,0 +47,4 @@
++#ifdef __IPHONE_OS_VERSION_MIN_REQUIRED
++#include <sys/statvfs.h>
++#include <utime.h>
++#endif
+@@ -728,0 +733,13 @@ void wfile_set_mod_date(char *filename,struct tm *date)
++#elif defined(__IPHONE_OS_VERSION_MIN_REQUIRED)
++    struct stat st;
++    struct utimbuf times;
++    time_t modtime;
++
++    if (filename==NULL || date==NULL)
++        return;
++    modtime=mktime(date);
++    if (modtime==(time_t)-1)
++        return;
++    times.actime = stat(filename,&st)==0 ? st.st_atime : time(NULL);
++    times.modtime = modtime;
++    utime(filename,&times);
+@@ -1085,0 +1103,16 @@ double wfile_freespace(char *volume,double *totalspace)
++#elif defined(__IPHONE_OS_VERSION_MIN_REQUIRED)
++    {
++    struct statvfs fs;
++    double blocksize;
++
++    if (statvfs(volume,&fs)!=0)
++        {
++        if (totalspace!=NULL)
++            (*totalspace) = -1;
++        return(-1);
++        }
++    blocksize = fs.f_frsize > 0 ? fs.f_frsize : fs.f_bsize;
++    if (totalspace!=NULL)
++        (*totalspace) = (double)fs.f_blocks * blocksize;
++    return((double)fs.f_bavail * blocksize);
++    }
+@@ -1287,0 +1321,3 @@ int wfile_check_file_64bit(char *filename)
++#elif defined(__IPHONE_OS_VERSION_MIN_REQUIRED)
++    (void)filename;
++    return(0);
+@@ -1769,0 +1806,6 @@ void wfile_fullname_zipex(char *fullname,char *path,char *spec)
++#ifdef __IPHONE_OS_VERSION_MIN_REQUIRED
++    (void)cwd;
++    (void)cmd;
++    fullname[0]='\0';
++    return;
++#else
+@@ -1781,0 +1824 @@ void wfile_fullname_zipex(char *fullname,char *path,char *spec)
++#endif
+@@ -3153,0 +3197,4 @@ int wfile_extract_in_place(char *filename)
++#ifdef __IPHONE_OS_VERSION_MIN_REQUIRED
++    (void)filename;
++    return(-1);
++#else
+@@ -3198,0 +3246 @@ int wfile_extract_in_place(char *filename)
++#endif
+diff --git a/willuslib/wgs.c b/willuslib/wgs.c
+index dd5885e..5053cc5 100644
+--- a/willuslib/wgs.c
++++ b/willuslib/wgs.c
+@@ -337,0 +338,6 @@ int willusgs_exec(int argc,char *argv[],FILE *out)
++#ifdef __IPHONE_OS_VERSION_MIN_REQUIRED
++    (void)argc;
++    (void)argv;
++    (void)out;
++    return(-1);
++#else
+@@ -400,0 +407 @@ printf("    argv[%d]='%s'\n",i,argv[i]);
++#endif
+diff --git a/willuslib/wsys.c b/willuslib/wsys.c
+index c89409b..4056bbc 100644
+--- a/willuslib/wsys.c
++++ b/willuslib/wsys.c
+@@ -709,0 +710,6 @@ int wsys_shell_command(char *cmd,char *stdoutfile,char *stderrfile)
++#ifdef __IPHONE_OS_VERSION_MIN_REQUIRED
++    (void)cmd;
++    (void)stdoutfile;
++    (void)stderrfile;
++    return(-1);
++#else
+@@ -758,0 +765 @@ int wsys_shell_command(char *cmd,char *stdoutfile,char *stderrfile)
++#endif
+diff --git a/willuslib/wzfile.c b/willuslib/wzfile.c
+index c02ac76..a4ef17a 100644
+--- a/willuslib/wzfile.c
++++ b/willuslib/wzfile.c
+@@ -127,0 +128,6 @@ static int archive_extract(char *archfile,char *file_to_extract,char *tempname)
++#ifdef __IPHONE_OS_VERSION_MIN_REQUIRED
++    (void)archfile;
++    (void)file_to_extract;
++    tempname[0]='\0';
++    return(0);
++#else
+@@ -158,0 +165 @@ static int archive_extract(char *archfile,char *file_to_extract,char *tempname)
++#endif
