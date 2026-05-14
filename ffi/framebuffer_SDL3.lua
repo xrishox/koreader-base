@@ -8,6 +8,10 @@ local framebuffer = {
     sdl_bb = nil,
 }
 
+local function getBackingSize(bb)
+    return tonumber(bb.w), tonumber(bb.h)
+end
+
 function framebuffer:init()
     if not self.dummy then
         -- Input dimensions are *window* sizes
@@ -32,10 +36,18 @@ end
 function framebuffer:resize(w, h)
     local output_w = ffi.new("int[1]", 0)
     local output_h = ffi.new("int[1]", 0)
+    local viewport = self.viewport
+    local old_bb = self.full_bb or self.bb
+    local old_w, old_h
+    if old_bb then
+        old_w, old_h = getBackingSize(old_bb)
+    end
 
     SDL.SDL.SDL_GetWindowSize(SDL.screen, output_w, output_h)
     SDL.win_w = w or tonumber(output_w[0])
     SDL.win_h = h or tonumber(output_h[0])
+    self.w = SDL.win_w
+    self.h = SDL.win_h
 
     if SDL.SDL.SDL_GetCurrentRenderOutputSize(SDL.renderer, output_w, output_h) then
         -- This is a workaround to obtain a simulacrum of real pixels in scenarios that marketing likes to refer to as "HiDPI".
@@ -50,6 +62,13 @@ function framebuffer:resize(w, h)
         h = SDL.win_h
     end
 
+    if not self.dummy and old_w == w and old_h == h then
+        SDL.w = w
+        SDL.h = h
+        self:_updateScreenSize()
+        return
+    end
+
     if not self.dummy then
         self:_newBB(w, h)
         SDL.w = w
@@ -61,6 +80,12 @@ function framebuffer:resize(w, h)
 
     if SDL.texture then SDL.destroyTexture(SDL.texture) end
     SDL.texture = SDL.createTexture(w, h)
+
+    self:_updateScreenSize()
+    if viewport and self:_viewportFits(viewport) then
+        self:setViewport(viewport)
+        return
+    end
 
     self.bb:fill(BB.COLOR_WHITE)
     self:refreshFull(0, 0, self:getWidth(), self:getHeight())
@@ -75,6 +100,11 @@ function framebuffer:_newBB(w, h)
     local inverse
 
     if self.sdl_bb then self.sdl_bb:free() end
+    if self.full_bb then
+        self.bb = self.full_bb
+        self.full_bb = nil
+    end
+    self.viewport = nil
     if self.bb then
         rotation = self.bb:getRotation()
         inverse = self.bb:getInverse() == 1
@@ -104,13 +134,74 @@ function framebuffer:_newBB(w, h)
     end
 end
 
+function framebuffer:_updateScreenSize()
+    local bb = self.full_bb or self.bb
+    local w, h = getBackingSize(bb)
+    self.screen_size = { w = w, h = h }
+    if self.screen_size.w > self.screen_size.h and self.is_always_portrait then
+        self.screen_size.w, self.screen_size.h = self.screen_size.h, self.screen_size.w
+    end
+end
+
+function framebuffer:_viewportFits(viewport)
+    return viewport.x >= 0 and viewport.y >= 0
+        and viewport.w >= 0 and viewport.h >= 0
+        and viewport.x + viewport.w <= self.screen_size.w
+        and viewport.y + viewport.h <= self.screen_size.h
+end
+
+function framebuffer:setViewport(viewport)
+    if viewport.x < 0 or viewport.x > self.screen_size.w
+    or viewport.y < 0 or viewport.y > self.screen_size.h
+    or viewport.w < 0 or viewport.x + viewport.w > self.screen_size.w
+    or viewport.h < 0 or viewport.y + viewport.h > self.screen_size.h then
+        error("fb:setViewport() bad viewport")
+    end
+
+    local first_viewport = not self.full_bb
+    if first_viewport then
+        self.full_bb = self.bb
+    end
+    self.debug("fb:setViewport() setting viewport to",
+               viewport.x, viewport.y,
+               viewport.w, viewport.h)
+    self.bb = self.full_bb:viewport(
+        viewport.x,
+        viewport.y,
+        viewport.w,
+        viewport.h)
+    self.viewport = viewport
+
+    local full_w = self.full_bb:getWidth()
+    local full_h = self.full_bb:getHeight()
+    local function clearRect(x, y, w, h)
+        if w > 0 and h > 0 then
+            self.full_bb:paintRect(x, y, w, h, BB.COLOR_WHITE)
+        end
+    end
+    if first_viewport then
+        self.full_bb:fill(BB.COLOR_WHITE)
+    else
+        clearRect(0, 0, full_w, viewport.y)
+        clearRect(0, viewport.y + viewport.h, full_w, full_h - viewport.y - viewport.h)
+        clearRect(0, viewport.y, viewport.x, viewport.h)
+        clearRect(viewport.x + viewport.w, viewport.y,
+            full_w - viewport.x - viewport.w, viewport.h)
+    end
+
+    if self.full_bb then
+        self:_render(self.full_bb, 0, 0, self.full_bb:getWidth(), self.full_bb:getHeight())
+    end
+end
+
 function framebuffer:_render(bb, x, y, w, h)
     -- x, y, w, h without rotation for SDL rectangle
     local px, py, pw, ph = bb:getPhysicalRect(x, y, w, h)
 
     -- A viewport is a Blitbuffer object that works on a rectangular
     -- subset of the underlying memory without allocating new memory.
-    local bb_rect = bb:viewport(x, y, w, h)
+    local full_update = x == 0 and y == 0 and w == bb:getWidth() and h == bb:getHeight()
+    local bb_rect = full_update and bb or bb:viewport(x, y, w, h)
     local sdl_rect = SDL.rect(px, py, pw, ph)
 
     if not bb_emu then

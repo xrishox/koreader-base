@@ -370,8 +370,10 @@ function S.waitForEvent(sec, usec)
             end
         end
     elseif event.type == SDL.SDL_EVENT_MOUSE_BUTTON_UP and event.button.which ~= SDL.SDL_TOUCH_MOUSEID
-        or event.type == SDL.SDL_EVENT_FINGER_UP then
+        or event.type == SDL.SDL_EVENT_FINGER_UP
+        or event.type == SDL.SDL_EVENT_FINGER_CANCELED then
         local is_finger = event.type == SDL.SDL_EVENT_FINGER_UP
+            or event.type == SDL.SDL_EVENT_FINGER_CANCELED
         local slot
         if is_finger then
             slot = getFingerSlot(event)
@@ -433,8 +435,12 @@ function S.waitForEvent(sec, usec)
         SDL.SDL_RenderPresent(S.renderer)
     elseif (event.type == SDL.SDL_EVENT_WINDOW_RESIZED
              or event.type == SDL.SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED
+             or event.type == SDL.SDL_EVENT_WINDOW_SAFE_AREA_CHANGED
              or event.type == SDL.SDL_EVENT_WINDOW_MOVED) then
         genEmuEvent(C.EV_SDL, event.type, event.window)
+    elseif (event.type == SDL.SDL_EVENT_DISPLAY_ORIENTATION
+             or event.type == SDL.SDL_EVENT_DISPLAY_USABLE_BOUNDS_CHANGED) then
+        genEmuEvent(C.EV_SDL, event.type, event.display)
 
     --- Gamepad support ---
     -- For debugging it can be helpful to use:
